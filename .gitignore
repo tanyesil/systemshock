@@ -67,3 +67,15 @@ zig-out/
 # CLion
 cmake-build-*
 .idea
+
+# Nix
+result
+result-*
+.direnv/
+
+# Local game assets / disc images
+/res/
+*.iso
+*.ISO
+*.cue
+*.CUE
