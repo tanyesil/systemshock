@@ -13,6 +13,8 @@ let
       coreutils,
       findutils,
       libarchive,
+      xorriso,
+      bchunk,
       SDL2,
       SDL2_mixer,
       fluidsynth,
@@ -30,10 +32,24 @@ let
     if gameData == null then
       null
     else
+      let
+        gameDataSrc =
+          if builtins.isPath gameData || (builtins.isString gameData && !builtins.hasContext gameData) then
+            builtins.path {
+              path = gameData;
+              name = "shockolate-gamedata-src";
+            }
+          else
+            gameData;
+      in
       runCommand "shockolate-gamedata"
         {
-          src = gameData;
-          nativeBuildInputs = [ libarchive ];
+          src = gameDataSrc;
+          nativeBuildInputs = [
+            libarchive
+            xorriso
+            bchunk
+          ];
         }
         ''
           set -euo pipefail
@@ -42,8 +58,31 @@ let
           mkdir -p "$work" "$out/res"
 
           if [ -f "$src" ]; then
-            bsdtar -xf "$src" -C "$work"
+            bsdtar -xf "$src" -C "$work" 2>/dev/null || true
             chmod -R u+rwX "$work"
+
+            # Handle zipped .bin/.cue Redump images by converting to .iso first
+            cue_file="$(find "$work" -maxdepth 2 -type f -iname '*.cue' | head -n 1)"
+            bin_file="$(find "$work" -maxdepth 2 -type f -iname '*.bin' | head -n 1)"
+            if [ -n "$cue_file" ] && [ -n "$bin_file" ]; then
+              (
+                cd "$(dirname "$cue_file")"
+                bchunk "$(basename "$bin_file")" "$(basename "$cue_file")" "$TMPDIR/track"
+              )
+              iso_track="$(find "$TMPDIR" -maxdepth 1 -type f -name 'track*.iso' | head -n 1)"
+              if [ -n "$iso_track" ]; then
+                rm -rf "$work"
+                mkdir -p "$work"
+                xorriso -osirrox on -indev "$iso_track" -extract / "$work"
+                chmod -R u+rwX "$work"
+              fi
+            elif [ -z "$(find "$work" -mindepth 1 -print -quit)" ]; then
+              # 1994 Origin CD-Producer v1.4 ISOs have non-standard volume descriptors
+              # that libarchive skips; xorriso extracts them cleanly.
+              xorriso -osirrox on -indev "$src" -extract / "$work"
+              chmod -R u+rwX "$work"
+            fi
+
             root="$work"
           elif [ -d "$src" ]; then
             root="$src"

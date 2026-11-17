@@ -79,3 +79,7 @@ result-*
 *.ISO
 *.cue
 *.CUE
+*.bin
+*.BIN
+*.zip
+*.ZIP

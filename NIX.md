@@ -37,18 +37,23 @@ Place your `data` (and optional `sound` folder for XMI music) under `${XDG_DATA_
     └── sound/     # GENMIDI/, SBLASTER/, ... (optional)
 ```
 
-If you have a **System Shock Classic CD-ROM `.iso`**, extract `CDROM/DATA`, `HD/DATA`, and `HD/SOUND` with `libarchive` (`bsdtar`):
+If you have a **System Shock Classic CD-ROM `.iso`**, extract `CDROM/DATA`, `HD/DATA`, and `HD/SOUND` with `xorriso` (which handles both standard ISOs and the 1994 Electronic Arts / Origin `CD-Producer` mastering descriptors):
 
 ```bash
 res_dir="${XDG_DATA_HOME:-$HOME/.local/share}/Interrupt/SystemShock/res"
+tmp_dir="$(mktemp -d)"
+nix shell nixpkgs#xorriso -c xorriso -osirrox on -indev "System Shock.iso" \
+  -extract /CDROM/DATA "$tmp_dir/cdrom_data" \
+  -extract /HD/DATA "$tmp_dir/hd_data" \
+  -extract /HD/SOUND "$tmp_dir/hd_sound"
+chmod -R u+rwX "$tmp_dir"
 mkdir -p "$res_dir/data" "$res_dir/sound"
-nix shell nixpkgs#libarchive -c bash -c '
-  bsdtar -xf SYSTEMSHOCK.ISO -C "$1/data" --strip-components=2 CDROM/DATA
-  chmod -R u+rwX "$1/data"
-  bsdtar -xf SYSTEMSHOCK.ISO -C "$1/data" --strip-components=2 HD/DATA
-  bsdtar -xf SYSTEMSHOCK.ISO -C "$1/sound" --strip-components=2 HD/SOUND
-  chmod -R u+rwX "$1"
-' _ "$res_dir"
+cp -rL "$tmp_dir/cdrom_data/." "$res_dir/data/"
+chmod -R u+rwX "$res_dir/data"
+cp -rLf "$tmp_dir/hd_data/." "$res_dir/data/"
+cp -rL "$tmp_dir/hd_sound/." "$res_dir/sound/"
+chmod -R u+rwX "$res_dir"
+rm -rf "$tmp_dir"
 ```
 
 ### 2. Environment Variable or CLI Flag
